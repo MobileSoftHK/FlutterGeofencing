@@ -51,7 +51,7 @@ class GeofencingPlugin : ActivityAware, FlutterPlugin, MethodCallHandler {
         private val sGeofenceCacheLock = Object()
 
         @JvmStatic
-        fun reRegisterAfterReboot(context: Context) {
+        fun reRegisterGeofence(context: Context, latitude: Double? = null, longitude: Double? = null) {
             synchronized(sGeofenceCacheLock) {
                 val p = context.getSharedPreferences(SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
                 val persistentGeofences: MutableSet<String> =
@@ -65,7 +65,7 @@ class GeofencingPlugin : ActivityAware, FlutterPlugin, MethodCallHandler {
                         list.add(gfArgs.get(i) as Any)
                     }
                     val geoClient = LocationServices.getGeofencingClient(context)
-                    registerGeofence(context, geoClient, list, null, false)
+                    registerGeofence(context, geoClient, list, null, false, latitude, longitude)
                 }
             }
         }
@@ -76,12 +76,14 @@ class GeofencingPlugin : ActivityAware, FlutterPlugin, MethodCallHandler {
                 geofencingClient: GeofencingClient,
                 args: ArrayList<*>?,
                 result: Result?,
-                cache: Boolean
+                cache: Boolean,
+                latitude: Double? = null,
+                longitude: Double? = null
         ) {
             val callbackHandle = args!![0] as Long
             val id = args[1] as String
-            val lat = args[2] as Double
-            val long = args[3] as Double
+            val lat = latitude ?: args[2] as Double
+            val long = longitude ?: args[3] as Double
             val radius = (args[4] as Number).toFloat()
             val fenceTriggers = args[5] as Int
             val initialTriggers = args[6] as Int
@@ -162,7 +164,7 @@ class GeofencingPlugin : ActivityAware, FlutterPlugin, MethodCallHandler {
         private fun getGeofencePendingIndent(context: Context, callbackHandle: Long): PendingIntent {
             val intent = Intent(context, GeofencingBroadcastReceiver::class.java).putExtra(CALLBACK_HANDLE_KEY, callbackHandle)
             return if (Build.VERSION.SDK_INT >= 31) {
-                PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
             } else {
                 PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
             }

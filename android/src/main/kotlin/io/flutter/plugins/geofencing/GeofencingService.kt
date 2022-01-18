@@ -128,17 +128,20 @@ class GeofencingService : MethodCallHandler, JobIntentService() {
 
         // Get the geofences that were triggered. A single event can trigger
         // multiple geofences.
-        val triggeringGeofences = geofencingEvent.triggeringGeofences.map {
-            it.requestId
+        var triggeringGeofences = listOf<String>()
+        if (geofencingEvent.triggeringGeofences != null) {
+            triggeringGeofences = geofencingEvent.triggeringGeofences.map {
+                it.requestId
+            }
         }
 
         val location = geofencingEvent.triggeringLocation
-        val locationList = listOf(location.latitude,
-                location.longitude)
-        val geofenceUpdateList = listOf(callbackHandle,
-                triggeringGeofences,
-                locationList,
-                geofenceTransition)
+        val locationList = mutableListOf<Double>()
+        location?.let {
+            locationList.add(location.latitude)
+            locationList.add(location.longitude)
+        }
+        val geofenceUpdateList = listOf(callbackHandle, triggeringGeofences, locationList, geofenceTransition)
 
         synchronized(sServiceStarted) {
             if (!sServiceStarted.get()) {
@@ -147,6 +150,7 @@ class GeofencingService : MethodCallHandler, JobIntentService() {
             } else {
                 // Callback method name is intentionally left blank.
                 Handler(mContext.mainLooper).post { mBackgroundChannel.invokeMethod("", geofenceUpdateList) }
+                GeofencingPlugin.reRegisterGeofence(mContext, location?.latitude, location?.longitude)
             }
         }
     }
