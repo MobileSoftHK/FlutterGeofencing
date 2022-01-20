@@ -58,7 +58,7 @@ static BOOL backgroundIsolateRun = NO;
             [_eventQueue removeObjectAtIndex:0];
             CLRegion* region = [event objectForKey:kRegionKey];
             int type = [[event objectForKey:kEventType] intValue];
-            [self sendLocationEvent:region eventType: type];
+            [self sendLocationEvent:_locationManager forRegion:region eventType: type];
         }
     }
     result(nil);
@@ -91,7 +91,7 @@ static BOOL backgroundIsolateRun = NO;
 - (void)locationManager:(CLLocationManager *)manager didEnterRegion:(CLRegion *)region {
   @synchronized(self) {
     if (initialized) {
-      [self sendLocationEvent:region eventType:kEnterEvent];
+        [self sendLocationEvent:manager forRegion:region eventType:kEnterEvent];
     } else {
       NSDictionary *dict = @{
         kRegionKey: region,
@@ -105,7 +105,9 @@ static BOOL backgroundIsolateRun = NO;
 - (void)locationManager:(CLLocationManager *)manager didExitRegion:(CLRegion *)region {
   @synchronized(self) {
     if (initialized) {
-      [self sendLocationEvent:region eventType:kExitEvent];
+        [self sendLocationEvent:manager forRegion:region eventType:kExitEvent];
+        CLLocation *location = manager.location;
+        [self registerGeofence:[self getCallbackHandleForRegionId:@"MyRegion"] latitude:location.coordinate.latitude longitude:location.coordinate.longitude radius:region.radius];
     } else {
       NSDictionary *dict = @{
         kRegionKey: region,
@@ -123,15 +125,15 @@ static BOOL backgroundIsolateRun = NO;
 
 #pragma mark GeofencingPlugin Methods
 
-- (void)sendLocationEvent:(CLRegion *)region eventType:(int)event {
+- (void)sendLocationEvent:(CLLocationManager *)manager forRegion:(CLRegion *)region eventType:(int)event {
   NSAssert([region isKindOfClass:[CLCircularRegion class]], @"region must be CLCircularRegion");
-  CLLocationCoordinate2D center = region.center;
+  CLLocationCoordinate2D coordinate = manager.location.coordinate;
   int64_t handle = [self getCallbackHandleForRegionId:region.identifier];
   if (handle != 0 && _callbackChannel != nil) {
       [_callbackChannel
        invokeMethod:@""
         arguments:@[
-            @(handle), @[ region.identifier ], @[ @(center.latitude), @(center.longitude) ], @(event)
+            @(handle), @[ region.identifier ], @[ @(coordinate.latitude), @(coordinate.longitude) ], @(event)
         ]];
   }
 }
@@ -144,9 +146,8 @@ static BOOL backgroundIsolateRun = NO;
   _locationManager = [[CLLocationManager alloc] init];
   [_locationManager setDelegate:self];
 
-    // no need to request permissions on app-start
-// [_locationManager requestAlwaysAuthorization];
-//  _locationManager.allowsBackgroundLocationUpdates = YES;
+ [_locationManager requestAlwaysAuthorization];
+  _locationManager.allowsBackgroundLocationUpdates = YES;
 
   _headlessRunner = [[FlutterEngine alloc] initWithName:@"GeofencingIsolate" project:nil allowHeadlessExecution:YES];
   _registrar = registrar;
@@ -189,12 +190,28 @@ static BOOL backgroundIsolateRun = NO;
   double radius = [arguments[4] doubleValue];
   int64_t triggerMask = [arguments[5] longLongValue];
 
-  CLCircularRegion *region =
-      [[CLCircularRegion alloc] initWithCenter:CLLocationCoordinate2DMake(latitude, longitude)
-                                        radius:radius
-                                    identifier:identifier];
+  CLCircularRegion *region = [
+      [CLCircularRegion alloc] initWithCenter:CLLocationCoordinate2DMake(latitude, longitude)
+      radius:radius
+      identifier:identifier
+  ];
   region.notifyOnEntry = ((triggerMask & 0x1) != 0);
   region.notifyOnExit = ((triggerMask & 0x2) != 0);
+  
+  [self setCallbackHandleForRegionId:callbackHandle regionId:identifier];
+  [self->_locationManager startMonitoringForRegion:region];
+}
+
+- (void)registerGeofence:(int64_t)callbackHandle latitude:(double)latitude longitude:(double)longitude radius:(double)radius {
+  NSString *identifier = @"MyRegion";
+
+  CLCircularRegion *region = [
+      [CLCircularRegion alloc] initWithCenter:CLLocationCoordinate2DMake(latitude, longitude)
+      radius:radius
+      identifier:identifier
+  ];
+  region.notifyOnEntry = false;
+  region.notifyOnExit = true;
   
   [self setCallbackHandleForRegionId:callbackHandle regionId:identifier];
   [self->_locationManager startMonitoringForRegion:region];
