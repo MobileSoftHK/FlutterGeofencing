@@ -69,6 +69,8 @@ static BOOL backgroundIsolateRun = NO;
     result(@([self removeGeofence:arguments]));
   } else if ([@"GeofencingPlugin.getRegisteredGeofenceIds" isEqualToString:call.method]) {
       result([self getMonitoredRegionIds:arguments]);
+  } else if ([@"GeofencingPlugin.getRegisteredGeofenceRegions" isEqualToString:call.method]) {
+      result([self getMonitoredRegions:arguments]);
   }
   else {
     result(FlutterMethodNotImplemented);
@@ -235,6 +237,24 @@ static BOOL backgroundIsolateRun = NO;
         [geofenceIds addObject:region.identifier];
     }
     return [NSArray arrayWithArray:geofenceIds];
+}
+
+- (NSArray*)getMonitoredRegions:()arguments{
+    NSMutableArray *geofences = [[NSMutableArray alloc] init];
+    for (CLCircularRegion *region in [self->_locationManager monitoredRegions]) {
+
+        NSString *latitude = [[NSNumber numberWithDouble:region.center.latitude] stringValue];
+        NSString *longitude = [[NSNumber numberWithDouble:region.center.longitude] stringValue];
+        NSString *radius = [[NSNumber numberWithDouble:region.radius] stringValue];
+        id objects[] = {region.identifier, latitude, longitude, radius};
+        id keys[] = {@"id", @"lat", @"long", @"radius"};
+        NSUInteger count = sizeof(objects) / sizeof(id);
+
+        NSDictionary *dict = [NSDictionary dictionaryWithObjects:objects forKeys:keys count:count];
+        [geofences addObject:dict];
+    }
+    return [NSArray arrayWithArray:geofences];
+
 }
 
 - (int64_t)getCallbackDispatcherHandle {

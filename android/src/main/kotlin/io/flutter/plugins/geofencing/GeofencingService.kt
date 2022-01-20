@@ -150,7 +150,7 @@ class GeofencingService : MethodCallHandler, JobIntentService() {
             } else {
                 // Callback method name is intentionally left blank.
                 Handler(mContext.mainLooper).post { mBackgroundChannel.invokeMethod("", geofenceUpdateList) }
-                GeofencingPlugin.reRegisterGeofence(mContext, location?.latitude, location?.longitude)
+                GeofencingPlugin.reRegisterGeofence(mContext, cache = true, latitude = location?.latitude, longitude = location?.longitude)
             }
         }
     }

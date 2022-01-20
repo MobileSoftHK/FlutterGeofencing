@@ -51,7 +51,7 @@ class GeofencingPlugin : ActivityAware, FlutterPlugin, MethodCallHandler {
         private val sGeofenceCacheLock = Object()
 
         @JvmStatic
-        fun reRegisterGeofence(context: Context, latitude: Double? = null, longitude: Double? = null) {
+        fun reRegisterGeofence(context: Context, cache: Boolean, latitude: Double? = null, longitude: Double? = null) {
             synchronized(sGeofenceCacheLock) {
                 val p = context.getSharedPreferences(SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
                 val persistentGeofences: MutableSet<String> =
@@ -64,8 +64,10 @@ class GeofencingPlugin : ActivityAware, FlutterPlugin, MethodCallHandler {
                     for (i in 0 until gfArgs.length()) {
                         list.add(gfArgs.get(i) as Any)
                     }
+                    latitude?.let { list[2] = it }
+                    longitude?.let { list[3] = it }
                     val geoClient = LocationServices.getGeofencingClient(context)
-                    registerGeofence(context, geoClient, list, null, false, latitude, longitude)
+                    registerGeofence(context, geoClient, list, null, cache)
                 }
             }
         }
@@ -76,14 +78,12 @@ class GeofencingPlugin : ActivityAware, FlutterPlugin, MethodCallHandler {
                 geofencingClient: GeofencingClient,
                 args: ArrayList<*>?,
                 result: Result?,
-                cache: Boolean,
-                latitude: Double? = null,
-                longitude: Double? = null
+                cache: Boolean
         ) {
             val callbackHandle = args!![0] as Long
             val id = args[1] as String
-            val lat = latitude ?: args[2] as Double
-            val long = longitude ?: args[3] as Double
+            val lat = args[2] as Double
+            val long = args[3] as Double
             val radius = (args[4] as Number).toFloat()
             val fenceTriggers = args[5] as Int
             val initialTriggers = args[6] as Int
@@ -196,6 +196,29 @@ class GeofencingPlugin : ActivityAware, FlutterPlugin, MethodCallHandler {
         }
 
         @JvmStatic
+        private fun getRegisteredGeofences(context: Context, result: Result) {
+            synchronized(sGeofenceCacheLock) {
+                val list = ArrayList<Map<String, String?>>()
+                var p = context.getSharedPreferences(SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
+                var persistentGeofences = p.getStringSet(PERSISTENT_GEOFENCES_IDS, null)
+                if (persistentGeofences != null && persistentGeofences.size > 0) {
+                    for (id in persistentGeofences) {
+                        var persistentGeofencesData = (p.getString(getPersistentGeofenceKey(id), null))?.split(",");
+                        var id = persistentGeofencesData?.get(1)
+                        var lat = persistentGeofencesData?.get(2)
+                        var long = persistentGeofencesData?.get(3)
+                        var radius = persistentGeofencesData?.get(4)
+
+                        val dataMap = mapOf("id" to id, "lat" to lat, "long" to long, "radius" to radius)
+                        list.add(dataMap);
+
+                    }
+                }
+                result.success(list)
+            }
+        }
+
+        @JvmStatic
         private fun removeGeofenceFromCache(context: Context, id: String) {
             synchronized(sGeofenceCacheLock) {
                 val p = context.getSharedPreferences(SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
@@ -277,6 +300,10 @@ class GeofencingPlugin : ActivityAware, FlutterPlugin, MethodCallHandler {
                     result
             )
             "GeofencingPlugin.getRegisteredGeofenceIds" -> getRegisteredGeofenceIds(
+                    mContext!!,
+                    result
+            )
+            "GeofencingPlugin.getRegisteredGeofenceRegions" -> getRegisteredGeofences(
                     mContext!!,
                     result
             )
