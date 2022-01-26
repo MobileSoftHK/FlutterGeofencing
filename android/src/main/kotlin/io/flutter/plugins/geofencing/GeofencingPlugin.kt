@@ -271,18 +271,6 @@ class GeofencingPlugin : ActivityAware, FlutterPlugin, MethodCallHandler {
         val args = call.arguments<ArrayList<*>>()
         when (call.method) {
             "GeofencingPlugin.initializeService" -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    mActivity?.requestPermissions(
-                            arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                            ), 12312
-                    )
-                } else
-                    mActivity?.requestPermissions(
-                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                            12312
-                    )
                 initializeService(mContext!!, args)
                 result.success(true)
             }
