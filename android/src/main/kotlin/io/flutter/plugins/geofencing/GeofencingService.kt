@@ -37,6 +37,8 @@ class GeofencingService : MethodCallHandler, JobIntentService() {
         private var sBackgroundFlutterEngine: FlutterEngine? = null
         @JvmStatic
         private val sServiceStarted = AtomicBoolean(false)
+        @JvmStatic
+        private val geofenceRegistred = AtomicBoolean(true)
 
         @JvmStatic
         private lateinit var sPluginRegistrantCallback: PluginRegistrantCallback
@@ -143,6 +145,8 @@ class GeofencingService : MethodCallHandler, JobIntentService() {
         }
         val geofenceUpdateList = listOf(callbackHandle, triggeringGeofences, locationList, geofenceTransition)
 
+        geofenceRegistred.set(false)
+
         synchronized(sServiceStarted) {
             if (!sServiceStarted.get()) {
                 // Queue up geofencing events while background isolate is starting
@@ -150,7 +154,10 @@ class GeofencingService : MethodCallHandler, JobIntentService() {
             } else {
                 // Callback method name is intentionally left blank.
                 Handler(mContext.mainLooper).post { mBackgroundChannel.invokeMethod("", geofenceUpdateList) }
+            }
+            if (!geofenceRegistred.get()) {
                 GeofencingPlugin.reRegisterGeofence(mContext, cache = true, latitude = location?.latitude, longitude = location?.longitude)
+                geofenceRegistred.set(true)
             }
         }
     }
